@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host · Math Blast</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="/"><span class="logo-mark">🚀</span>Math <b>Blast</b></a>
+    <div class="hud-group">
+      <button class="icon-btn" id="fullscreen" aria-label="Full screen" title="Full screen">⛶</button>
+      <button class="icon-btn" id="mute" aria-label="Toggle sound"></button>
+    </div>
+  </header>
+
+  <!-- setup -->
+  <main class="wrap" id="setupView">
+    <div class="panel setup">
+      <h2>📺 Host a game</h2>
+      <p class="sub">Students join on their own devices and answer at their own pace. Everyone's points fuel the class rocket.</p>
+      <div id="setup"></div>
+      <div class="error-msg" id="setupErr"></div>
+      <div class="actions"><button class="btn big purple" id="create">Create room ✨</button></div>
+    </div>
+  </main>
+
+  <!-- lobby -->
+  <main class="wrap" id="lobbyView" hidden>
+    <div class="host-head">
+      <div class="join-info">
+        <div><div class="code-label">Go to</div><div class="url"><b class="joinUrl"></b></div></div>
+        <div><div class="code-label">Game PIN</div><div class="code pinCode"></div></div>
+      </div>
+      <div class="hud-group">
+        <span class="lobby-count">👥 <span id="lobbyCount">0</span></span>
+        <button class="btn big green" id="start">Start game ▶</button>
+      </div>
+    </div>
+    <p style="opacity:.85;margin-top:14px" id="settingsSummary"></p>
+    <div class="lobby-players" id="lobbyPlayers"></div>
+    <p class="center" style="opacity:.7">Tip: click a name to remove a player.</p>
+  </main>
+
+  <!-- live -->
+  <main class="wrap" id="liveView" hidden>
+    <div class="host-head">
+      <div class="join-info" style="padding:10px 18px">
+        <div><div class="code-label">Join at <span class="joinUrl"></span></div><div class="code pinCode" style="font-size:2.2rem"></div></div>
+      </div>
+      <div class="big-timer" id="bigTimer">0:00</div>
+      <button class="btn pink" id="end">End game ■</button>
+    </div>
+    <div class="live-grid">
+      <div class="rocket-panel">
+        <h3>🚀 Class Goal</h3>
+        <div class="class-total" id="classTotal">0</div>
+        <div style="opacity:.85">of <b id="goal">0</b> points</div>
+        <div class="rocket-track">
+          <span class="planet">🪐</span>
+          <div class="tube"><div class="fuel" id="fuel"></div></div>
+          <span class="rocket" id="rocket" style="bottom:0">🚀</span>
+          <span class="milestone" data-m="25" style="bottom:25%">25%</span>
+          <span class="milestone" data-m="50" style="bottom:50%">50%</span>
+          <span class="milestone" data-m="75" style="bottom:75%">75%</span>
+          <span class="milestone" data-m="100" style="bottom:100%">GOAL!</span>
+        </div>
+        <div class="class-stats">
+          <div><b id="statPlayers">0</b><span>players</span></div>
+          <div><b id="statAnswered">0</b><span>questions answered</span></div>
+          <div><b id="statAcc">0%</b><span>class accuracy</span></div>
+          <div><b id="statStreak">0</b><span>best streak</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="board">
+          <h3><span>🏆 Leaderboard</span><span class="muted" style="font-size:1rem" id="boardCount"></span></h3>
+          <div class="board-list" id="board"></div>
+        </div>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- podium -->
+  <main class="wrap" id="endView" hidden>
+    <h1 class="center" style="font-size:clamp(2rem,6vw,3.4rem);margin:0;text-shadow:0 5px 0 rgba(0,0,0,.25)">🏁 Final Results</h1>
+    <p class="center" style="font-size:1.3rem;font-weight:700" id="endGoal"></p>
+    <div class="podium" id="podium"></div>
+    <div class="panel" style="max-width:860px;margin:20px auto 0">
+      <div class="stat-grid" id="endStats"></div>
+      <table class="results" id="endTable"></table>
+      <div class="actions">
+        <button class="btn big green" id="again">New game, same settings 🔁</button>
+        <button class="btn big white" id="csv">Download results ⬇</button>
+        <button class="btn big white" id="change">Change settings</button>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initSky, muteButton, $, $$, api, store, esc, fmt, fmtTime, countTo, confetti, sound, renderBoard, gradeLabel, toast } from './js/ui.js';
+    import { renderSetup } from './js/setup.js';
+    import { topicsForGrade } from './js/questions.js';
+
+    initSky();
+    muteButton($('#mute'));
+    $('#fullscreen').addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    });
+
+    const views = ['setupView', 'lobbyView', 'liveView', 'endView'];
+    const show = id => views.forEach(v => ($('#' + v).hidden = v !== id));
+    const setup = renderSetup($('#setup'), 'host');
+
+    let code = null, key = null, es = null, room = null, offset = 0, timerInt = null;
+    let lastCount = 0, goalCelebrated = false, podiumShown = false, lastFeedId = null;
+
+    async function create(settings) {
+      try {
+        const res = await api('/api/rooms', settings);
+        store.set(`mb:host:${res.code}`, res.hostKey);
+        enterRoom(res.code, res.hostKey);
+      } catch (err) {
+        $('#setupErr').textContent = err.message;
+      }
+    }
+
+    function enterRoom(c, k) {
+      code = c; key = k;
+      history.replaceState(null, '', `host.html?code=${code}`);
+      const url = `${location.host}/play.html`;
+      $$('.joinUrl').forEach(el => (el.textContent = url));
+      $$('.pinCode').forEach(el => (el.textContent = code.replace(/(\d{3})(\d{3})/, '$1 $2')));
+      lastCount = 0; goalCelebrated = false; podiumShown = false; lastFeedId = null;
+      es?.close();
+      es = new EventSource(`/api/rooms/${code}/stream`);
+      es.addEventListener('state', e => onState(JSON.parse(e.data)));
+      clearInterval(timerInt);
+      timerInt = setInterval(tickTimer, 250);
+    }
+
+    function onState(s) {
+      room = s;
+      offset = s.serverNow - Date.now();
+      if (s.status === 'lobby') paintLobby(s);
+      else if (s.status === 'playing') paintLive(s);
+      else paintEnd(s);
+    }
+
+    // ----- lobby -----
+    function paintLobby(s) {
+      show('lobbyView');
+      const topics = topicsForGrade(s.grade).filter(t => s.topics.includes(t.id)).map(t => t.name);
+      $('#settingsSummary').innerHTML = `<b>${esc(gradeLabel(s.grade))}</b> · ${s.duration ? s.duration / 60 + ' min' : 'no time limit'} · class goal <b>${fmt(s.goal)}</b> · ${esc(topics.join(', '))}`;
+      $('#lobbyCount').textContent = s.players.length;
+      if (s.players.length > lastCount) sound('pop');
+      lastCount = s.players.length;
+      const existing = new Set($$('.lobby-player').map(el => el.dataset.id));
+      $('#lobbyPlayers').innerHTML = s.players.length
+        ? s.players.map(p => `<button class="lobby-player" data-id="${p.id}" style="${existing.has(p.id) ? 'animation:none' : ''}" title="Remove ${esc(p.name)}"><span class="a">${esc(p.avatar)}</span>${esc(p.name)}</button>`).join('')
+        : `<div class="empty-lobby">Waiting for players to join<span class="dots"></span><br><span style="font-size:3rem">👀</span></div>`;
+    }
+    $('#lobbyPlayers').addEventListener('click', async e => {
+      const b = e.target.closest('.lobby-player');
+      if (!b || !confirm(`Remove ${b.textContent.trim()} from the game?`)) return;
+      await api(`/api/rooms/${code}/kick`, { key, playerId: b.dataset.id }).catch(err => toast(err.message));
+    });
+    $('#start').addEventListener('click', async () => {
+      if (!room?.players.length && !confirm('No one has joined yet. Start anyway?')) return;
+      sound('start');
+      await api(`/api/rooms/${code}/start`, { key }).catch(err => toast(err.message));
+    });
+
+    // ----- live -----
+    function tickTimer() {
+      if (!room || room.status !== 'playing') return;
+      if (!room.endsAt) { $('#bigTimer').textContent = '∞'; return; }
+      const left = (room.endsAt - (Date.now() + offset)) / 1000;
+      $('#bigTimer').textContent = fmtTime(left);
+      $('#bigTimer').classList.toggle('low', left <= 15);
+    }
+
+    function paintLive(s) {
+      if ($('#liveView').hidden) show('liveView');
+      const pct = Math.min(100, (s.classTotal / s.goal) * 100);
+      countTo($('#classTotal'), s.classTotal);
+      $('#goal').textContent = fmt(s.goal);
+      $('#fuel').style.height = `${pct}%`;
+      $('#rocket').style.bottom = `${pct}%`;
+      $$('.milestone').forEach(m => m.classList.toggle('hit', pct >= Number(m.dataset.m)));
+      if (pct >= 100 && !goalCelebrated) {
+        goalCelebrated = true;
+        confetti({ count: 250, duration: 4500 });
+        sound('fanfare');
+      }
+      const answered = s.players.reduce((n, p) => n + p.answered, 0);
+      const correct = s.players.reduce((n, p) => n + p.correct, 0);
+      $('#statPlayers').textContent = s.players.length;
+      $('#statAnswered').textContent = fmt(answered);
+      $('#statAcc').textContent = answered ? `${Math.round((correct / answered) * 100)}%` : '–';
+      $('#statStreak').textContent = Math.max(0, ...s.players.map(p => p.bestStreak));
+      $('#boardCount').textContent = s.players.length > 10 ? `top 10 of ${s.players.length}` : '';
+      renderBoard($('#board'), s.players, { limit: 10 });
+
+      const feed = s.feed.slice().reverse().slice(0, 6);
+      if (feed[0]?.id !== lastFeedId) {
+        lastFeedId = feed[0]?.id;
+        $('#feed').innerHTML = feed.map((f, i) => `<div class="feed-item" style="${i ? 'animation:none' : ''}">${esc(f.text)}</div>`).join('');
+      }
+    }
+
+    $('#end').addEventListener('click', async () => {
+      if (!confirm('End the game for everyone?')) return;
+      await api(`/api/rooms/${code}/end`, { key }).catch(err => toast(err.message));
+    });
+
+    // ----- podium -----
+    function paintEnd(s) {
+      if (podiumShown) return;
+      podiumShown = true;
+      clearInterval(timerInt);
+      show('endView');
+      es?.close();
+      const answered = s.players.reduce((n, p) => n + p.answered, 0);
+      const correct = s.players.reduce((n, p) => n + p.correct, 0);
+      $('#endGoal').textContent = s.classTotal >= s.goal
+        ? `🚀 GOAL REACHED! The class earned ${fmt(s.classTotal)} points together!`
+        : `🚀 The class earned ${fmt(s.classTotal)} of ${fmt(s.goal)} points together.`;
+      $('#endStats').innerHTML = [
+        [fmt(s.classTotal), 'class points'], [s.players.length, 'players'], [fmt(answered), 'questions answered'],
+        [answered ? Math.round((correct / answered) * 100) + '%' : '–', 'accuracy'],
+      ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+      $('#endTable').innerHTML = `<tr><th>#</th><th>Player</th><th class="num">Correct</th><th class="num">Accuracy</th><th class="num">Best streak</th><th class="num">Points</th></tr>` +
+        s.players.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.avatar)} ${esc(p.name)}</td><td class="num">${p.correct}/${p.answered}</td><td class="num">${p.answered ? Math.round((p.correct / p.answered) * 100) : 0}%</td><td class="num">${p.bestStreak}</td><td class="num"><b>${fmt(p.score)}</b></td></tr>`).join('');
+
+      const top = s.players.slice(0, 3);
+      $('#podium').innerHTML = top.map((p, i) => `<div class="spot p${i + 1}">
+        <div class="who"><span class="a">${esc(p.avatar)}</span>${esc(p.name)}</div>
+        <div class="block"><span class="place">${['🥇', '🥈', '🥉'][i]}</span><span class="sc">${fmt(p.score)}</span></div></div>`).join('');
+      // Reveal 3rd, then 2nd, then 1st.
+      [3, 2, 1].forEach((place, k) => setTimeout(() => {
+        const spot = $(`.podium .p${place}`);
+        if (!spot) return;
+        spot.classList.add('show');
+        if (place === 1) { sound('fanfare'); confetti({ count: 260, duration: 5000 }); }
+        else sound('pop');
+      }, 600 + k * 1100));
+    }
+
+    $('#csv').addEventListener('click', () => {
+      if (!room) return;
+      const rows = [['Rank', 'Name', 'Points', 'Correct', 'Answered', 'Accuracy %', 'Best streak']];
+      room.players.forEach((p, i) => rows.push([i + 1, p.name, p.score, p.correct, p.answered, p.answered ? Math.round((p.correct / p.answered) * 100) : 0, p.bestStreak]));
+      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = `math-blast-${code}.csv`;
+      a.click();
+    });
+    $('#again').addEventListener('click', () => create({ grade: room.grade, topics: room.topics, duration: room.duration, goal: room.goal }));
+    $('#change').addEventListener('click', () => { es?.close(); history.replaceState(null, '', 'host.html'); show('setupView'); });
+    $('#create').addEventListener('click', () => create(setup.get()));
+
+    // Resume a room after a refresh.
+    const resume = new URLSearchParams(location.search).get('code');
+    const resumeKey = resume && store.get(`mb:host:${resume}`);
+    if (resumeKey) {
+      api(`/api/rooms/${resume}`).then(() => enterRoom(resume, resumeKey)).catch(() => history.replaceState(null, '', 'host.html'));
+    }
+  </script>
+</body>
+</html>

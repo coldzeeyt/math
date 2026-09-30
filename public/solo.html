@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solo Practice · Math Blast</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="/"><span class="logo-mark">🚀</span>Math <b>Blast</b></a>
+    <button class="icon-btn" id="mute" aria-label="Toggle sound"></button>
+  </header>
+
+  <!-- setup -->
+  <main class="wrap" id="setupView">
+    <div class="panel setup">
+      <h2>🎮 Solo Practice</h2>
+      <p class="sub">Answer as many as you can. 5 in a row opens a treasure chest!</p>
+      <div id="setup"></div>
+      <div class="actions"><button class="btn big green" id="go">Let's go! ➜</button></div>
+    </div>
+    <div class="panel setup" style="margin-top:20px" id="hallPanel" hidden>
+      <h2>🏆 Your Hall of Fame</h2>
+      <p class="sub">Your best solo runs on this device.</p>
+      <table class="results" id="hall"></table>
+    </div>
+  </main>
+
+  <!-- game -->
+  <main id="gameView" hidden>
+    <div class="hud">
+      <div class="hud-group">
+        <span class="pill score">⭐ <span id="score">0</span></span>
+        <span class="pill streak" id="streakPill">🔥 <span id="streak">0</span></span>
+        <span class="pill mult" id="multPill" hidden>⚡ 2× <small id="multLeft"></small></span>
+      </div>
+      <div class="hud-group">
+        <span class="pill timer" id="timerPill">⏱️ <span id="timer">0:00</span></span>
+        <button class="btn ghost" id="finish" style="padding:8px 14px;font-size:1rem">Finish</button>
+      </div>
+    </div>
+    <div class="stage" id="stage"></div>
+  </main>
+
+  <!-- results -->
+  <main class="wrap" id="resultView" hidden>
+    <div class="panel setup center">
+      <div class="result-hero" id="resultEmoji">🏆</div>
+      <h2 id="resultTitle" style="font-size:2.2rem">Great job!</h2>
+      <div id="newBest"></div>
+      <div class="stat-grid">
+        <div class="stat"><b id="rScore">0</b><span>Points</span></div>
+        <div class="stat"><b id="rCorrect">0</b><span>Correct</span></div>
+        <div class="stat"><b id="rAcc">0%</b><span>Accuracy</span></div>
+        <div class="stat"><b id="rStreak">0</b><span>Best streak</span></div>
+      </div>
+      <p class="muted" id="rBest"></p>
+      <div class="actions">
+        <button class="btn big green" id="again">Play again 🔁</button>
+        <button class="btn big white" id="change">Change settings</button>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initSky, muteButton, $, store, fmt, fmtTime, countTo, confetti, sound, gradeLabel, esc } from './js/ui.js';
+    import { renderSetup } from './js/setup.js';
+    import { Quiz } from './js/quiz.js';
+    import { newPlayerStats, scoreAnswer } from './js/scoring.js';
+
+    initSky();
+    muteButton($('#mute'));
+    const setup = renderSetup($('#setup'), 'solo');
+    let settings, stats, quiz, timer, endsAt;
+
+    const show = id => ['setupView', 'gameView', 'resultView'].forEach(v => ($('#' + v).hidden = v !== id));
+
+    function paintHall() {
+      const runs = store.get('mb:solo:runs', []);
+      $('#hallPanel').hidden = !runs.length;
+      $('#hall').innerHTML = `<tr><th>#</th><th>Grade</th><th>Time</th><th class="num">Correct</th><th class="num">Points</th></tr>` +
+        runs.map((r, i) => `<tr><td>${['🥇', '🥈', '🥉'][i] || i + 1}</td><td>${esc(gradeLabel(r.grade))}</td><td>${r.duration ? fmtTime(r.duration) : '∞'}</td><td class="num">${r.correct}/${r.answered}</td><td class="num"><b>${fmt(r.score)}</b></td></tr>`).join('');
+    }
+    paintHall();
+
+    async function countdown() {
+      const ov = document.createElement('div');
+      ov.className = 'overlay';
+      document.body.appendChild(ov);
+      for (const n of ['3', '2', '1', 'GO!']) {
+        ov.innerHTML = `<div class="chest-reward" style="font-size:8rem;font-weight:700;text-shadow:0 8px 0 rgba(0,0,0,.3)">${n}</div>`;
+        sound(n === 'GO!' ? 'start' : 'tick');
+        await new Promise(r => setTimeout(r, n === 'GO!' ? 500 : 700));
+      }
+      ov.remove();
+    }
+
+    function paintHud() {
+      countTo($('#score'), stats.score);
+      $('#streak').textContent = stats.streak;
+      $('#streakPill').classList.toggle('hot', stats.streak >= 3);
+      $('#multPill').hidden = stats.multLeft <= 0;
+      $('#multLeft').textContent = `${stats.multLeft} left`;
+    }
+
+    async function start() {
+      settings = setup.get();
+      stats = newPlayerStats();
+      $('#score').dataset.v = 0;
+      paintHud();
+      show('gameView');
+      $('#timer').textContent = settings.duration ? fmtTime(settings.duration) : '∞';
+      await countdown();
+      quiz = new Quiz($('#stage'), {
+        grade: settings.grade,
+        topics: settings.topics,
+        onAnswer: async (correct, ms) => {
+          const r = scoreAnswer(stats, { correct, ms });
+          paintHud();
+          return { ...r, streak: stats.streak };
+        },
+      });
+      quiz.start();
+      endsAt = settings.duration ? Date.now() + settings.duration * 1000 : null;
+      let lastTick = null;
+      timer = setInterval(() => {
+        if (!endsAt) return;
+        const left = (endsAt - Date.now()) / 1000;
+        $('#timer').textContent = fmtTime(left);
+        $('#timerPill').classList.toggle('low', left <= 10);
+        const whole = Math.ceil(left);
+        if (left <= 5 && whole !== lastTick && whole > 0) { lastTick = whole; sound('tick'); }
+        if (left <= 0) finish();
+      }, 200);
+    }
+
+    function finish() {
+      clearInterval(timer);
+      quiz?.stop();
+      document.querySelectorAll('.overlay').forEach(o => o.remove());
+      const acc = stats.answered ? Math.round((stats.correct / stats.answered) * 100) : 0;
+      const key = `mb:solo:best:${settings.grade}:${settings.duration}`;
+      const prevBest = store.get(key, 0);
+      const isBest = stats.score > prevBest && stats.score > 0;
+      if (isBest) store.set(key, stats.score);
+
+      const runs = store.get('mb:solo:runs', []);
+      if (stats.answered) {
+        runs.push({ score: stats.score, grade: settings.grade, duration: settings.duration, correct: stats.correct, answered: stats.answered, at: Date.now() });
+        runs.sort((a, b) => b.score - a.score);
+        store.set('mb:solo:runs', runs.slice(0, 10));
+      }
+      paintHall();
+
+      $('#resultEmoji').textContent = acc >= 90 ? '🏆' : acc >= 70 ? '🌟' : acc >= 40 ? '💪' : '🌱';
+      $('#resultTitle').textContent = acc >= 90 ? 'Math legend!' : acc >= 70 ? 'Awesome work!' : acc >= 40 ? 'Nice effort!' : 'Keep practicing!';
+      $('#newBest').innerHTML = isBest ? '<span class="new-best">⭐ NEW PERSONAL BEST! ⭐</span>' : '';
+      $('#rScore').dataset.v = 0;
+      countTo($('#rScore'), stats.score, 1200);
+      $('#rCorrect').textContent = `${stats.correct}/${stats.answered}`;
+      $('#rAcc').textContent = `${acc}%`;
+      $('#rStreak').textContent = stats.bestStreak;
+      $('#rBest').textContent = isBest || !prevBest ? '' : `Your best for ${gradeLabel(settings.grade)} at this length: ${fmt(prevBest)} points`;
+      show('resultView');
+      if (acc >= 70 || isBest) { confetti(); sound('fanfare'); }
+    }
+
+    $('#go').addEventListener('click', start);
+    $('#finish').addEventListener('click', finish);
+    $('#again').addEventListener('click', start);
+    $('#change').addEventListener('click', () => show('setupView'));
+  </script>
+</body>
+</html>

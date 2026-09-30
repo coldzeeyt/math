@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Math Blast</title>
+  <meta name="description" content="A live math game: play solo or join your class, answer at your own pace, and blast your team to the class goal.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="/"><span class="logo-mark">🚀</span>Math <b>Blast</b></a>
+    <button class="icon-btn" id="mute" aria-label="Toggle sound"></button>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Math <span class="accent">Blast!</span></h1>
+      <p>Answer at your own speed, stack up streaks, crack open treasure chests, and blast your class rocket to the goal. 🚀</p>
+      <form class="pin-box" id="pinForm">
+        <input id="pin" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Game PIN" aria-label="Game PIN">
+        <button class="btn pink" type="submit">Join</button>
+      </form>
+    </section>
+
+    <section class="modes">
+      <a class="mode-card solo" href="solo.html" data-sym="+">
+        <span class="big-emoji">🎮</span>
+        <h3>Play Solo</h3>
+        <p>Practice by yourself. Beat the clock and your own high score.</p>
+        <span class="go">Start practicing ➜</span>
+      </a>
+      <a class="mode-card join" href="play.html" data-sym="×">
+        <span class="big-emoji">🙋</span>
+        <h3>Join a Game</h3>
+        <p>Got a PIN from your teacher? Hop in and help your class win.</p>
+        <span class="go">Enter PIN ➜</span>
+      </a>
+      <a class="mode-card host" href="host.html" data-sym="÷">
+        <span class="big-emoji">📺</span>
+        <h3>Host a Game</h3>
+        <p>Create a room, show the live leaderboard, and watch the class rocket climb.</p>
+        <span class="go">Create room ➜</span>
+      </a>
+    </section>
+
+    <section class="features">
+      <div class="feature"><b>🐢🐇 Everyone's own pace</b>No waiting for the slowest or fastest — each student gets their own stream of questions.</div>
+      <div class="feature"><b>🚀 Team goal</b>Every point anyone earns fuels the whole class's rocket.</div>
+      <div class="feature"><b>🍕 Visual math</b>Pizzas, ten frames, clocks, number lines, graphs and 3D blocks.</div>
+      <div class="feature"><b>🎁 Chests & streaks</b>Five right in a row opens a treasure chest with surprise power-ups.</div>
+    </section>
+  </main>
+  <script type="module">
+    import { initSky, muteButton, $ } from './js/ui.js';
+    initSky();
+    muteButton($('#mute'));
+    $('#pinForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const pin = $('#pin').value.replace(/\D/g, '');
+      location.href = pin ? `play.html?code=${pin}` : 'play.html';
+    });
+  </script>
+</body>
+</html>

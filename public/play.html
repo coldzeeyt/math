@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join Game · Math Blast</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🙋</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="/"><span class="logo-mark">🚀</span>Math <b>Blast</b></a>
+    <button class="icon-btn" id="mute" aria-label="Toggle sound"></button>
+  </header>
+
+  <!-- step 1: code -->
+  <main class="wrap" id="codeView">
+    <div class="panel center" style="max-width:480px;margin:30px auto">
+      <div style="font-size:4rem">🙋</div>
+      <h2>Join a game</h2>
+      <p class="sub">Type the Game PIN on your teacher's screen.</p>
+      <form id="codeForm">
+        <input class="text-input" id="code" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="123456"
+               style="text-align:center;font-size:2rem;letter-spacing:8px" aria-label="Game PIN">
+        <div class="error-msg" id="codeErr"></div>
+        <button class="btn big pink block" type="submit">Next ➜</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- step 2: name + avatar -->
+  <main class="wrap" id="nameView" hidden>
+    <div class="panel" style="max-width:560px;margin:20px auto">
+      <h2 class="center">Pick your player</h2>
+      <p class="sub center" id="roomInfo"></p>
+      <form id="nameForm">
+        <div class="field"><label for="name">Nickname</label>
+          <input class="text-input" id="name" maxlength="16" autocomplete="off" placeholder="Your first name"></div>
+        <div class="field"><span class="label">Avatar</span><div class="avatars" id="avatars"></div></div>
+        <div class="error-msg" id="nameErr"></div>
+        <button class="btn big green block" type="submit">I'm ready! 🚀</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- lobby -->
+  <main class="wrap" id="lobbyView" hidden>
+    <div class="waiting">
+      <span class="me-avatar" id="lobbyAvatar"></span>
+      <h2>You're in, <span id="lobbyName"></span>!</h2>
+      <p style="font-size:1.25rem;opacity:.9">See your name on the big screen? Waiting for the host to start<span class="dots"></span></p>
+      <p class="pill" id="lobbyCount" style="margin-top:12px"></p>
+      <p style="opacity:.8;margin-top:24px">💡 Tip: you can press <b>1 2 3 4</b> on the keyboard to answer.</p>
+    </div>
+  </main>
+
+  <!-- game -->
+  <main id="gameView" hidden>
+    <div class="hud">
+      <div class="hud-group">
+        <span class="pill"><span id="hudAvatar"></span> <span id="hudName"></span></span>
+        <span class="pill score">⭐ <span id="score">0</span></span>
+        <span class="pill streak" id="streakPill">🔥 <span id="streak">0</span></span>
+        <span class="pill mult" id="multPill" hidden>⚡ 2× <small id="multLeft"></small></span>
+      </div>
+      <div class="hud-group">
+        <span class="pill">🏅 <span id="rank">–</span></span>
+        <span class="pill timer" id="timerPill">⏱️ <span id="timer">–</span></span>
+      </div>
+    </div>
+    <div class="goal-bar">
+      <div class="goal-track"><div class="goal-fill" id="goalFill"></div><span class="goal-rocket" id="goalRocket">🚀</span></div>
+      <div class="goal-label"><span>Class total: <b id="classTotal">0</b></span><span>Goal: <b id="goal">0</b></span></div>
+    </div>
+    <div class="stage" id="stage"></div>
+  </main>
+
+  <!-- final -->
+  <main class="wrap" id="endView" hidden>
+    <div class="panel center" style="max-width:640px;margin:10px auto">
+      <div class="result-hero" id="endMedal">🏆</div>
+      <h2 style="font-size:2.2rem" id="endTitle"></h2>
+      <p class="sub" id="endSub"></p>
+      <div class="stat-grid">
+        <div class="stat"><b id="eScore">0</b><span>Points</span></div>
+        <div class="stat"><b id="eCorrect">0</b><span>Correct</span></div>
+        <div class="stat"><b id="eAcc">0%</b><span>Accuracy</span></div>
+        <div class="stat"><b id="eStreak">0</b><span>Best streak</span></div>
+      </div>
+      <p id="endGoal" style="font-weight:700;font-size:1.2rem"></p>
+      <div class="board" style="box-shadow:none;padding:0"><div class="board-list" id="endBoard"></div></div>
+      <div class="actions">
+        <a class="btn big green" href="solo.html">Keep practicing 🎮</a>
+        <a class="btn big white" href="/">Home</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- kicked / error -->
+  <main class="wrap" id="goneView" hidden>
+    <div class="panel center" style="max-width:480px;margin:30px auto">
+      <div style="font-size:4rem">👋</div>
+      <h2 id="goneTitle">You left the game</h2>
+      <p class="sub" id="goneSub"></p>
+      <a class="btn big pink" href="play.html">Join another game</a>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initSky, muteButton, $, $$, api, store, esc, fmt, fmtTime, countTo, confetti, sound, AVATARS, renderBoard, gradeLabel, toast } from './js/ui.js';
+    import { Quiz } from './js/quiz.js';
+
+    initSky();
+    muteButton($('#mute'));
+
+    const views = ['codeView', 'nameView', 'lobbyView', 'gameView', 'endView', 'goneView'];
+    const show = id => views.forEach(v => ($('#' + v).hidden = v !== id));
+
+    let code = null, me = null, room = null, quiz = null, es = null, offset = 0, timerInt = null, ended = false;
+    let avatar = store.get('mb:avatar', AVATARS[Math.floor(Math.random() * AVATARS.length)]);
+
+    // ----- step 1: code -----
+    const params = new URLSearchParams(location.search);
+    if (params.get('code')) $('#code').value = params.get('code');
+
+    $('#codeForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const c = $('#code').value.replace(/\D/g, '');
+      if (c.length !== 6) { $('#codeErr').textContent = 'The PIN has 6 numbers.'; return; }
+      try {
+        room = await api(`/api/rooms/${c}`);
+        code = c;
+        if (room.status === 'ended') { $('#codeErr').textContent = 'That game has already ended.'; return; }
+        const saved = store.get(`mb:player:${code}`);
+        if (saved) {
+          try { return await joined(await api(`/api/rooms/${code}/join`, { playerId: saved.playerId }), saved.avatar); }
+          catch { store.set(`mb:player:${code}`, null); }
+        }
+        $('#roomInfo').textContent = `${gradeLabel(room.grade)} · ${room.players.length} player${room.players.length === 1 ? '' : 's'} joined`;
+        paintAvatars();
+        show('nameView');
+        $('#name').value = store.get('mb:name', '');
+        $('#name').focus();
+      } catch (err) {
+        $('#codeErr').textContent = err.message;
+      }
+    });
+
+    // ----- step 2: name + avatar -----
+    function paintAvatars() {
+      $('#avatars').innerHTML = AVATARS.map(a => `<button type="button" class="avatar-btn ${a === avatar ? 'on' : ''}">${a}</button>`).join('');
+    }
+    $('#avatars').addEventListener('click', e => {
+      const b = e.target.closest('.avatar-btn');
+      if (!b) return;
+      avatar = b.textContent;
+      sound('pop');
+      paintAvatars();
+    });
+    $('#nameForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = $('#name').value.trim();
+      if (!name) { $('#nameErr').textContent = 'Type a nickname first!'; return; }
+      try {
+        store.set('mb:name', name);
+        store.set('mb:avatar', avatar);
+        const res = await api(`/api/rooms/${code}/join`, { name, avatar });
+        store.set(`mb:player:${code}`, { playerId: res.playerId, avatar });
+        sound('start');
+        joined(res, avatar);
+      } catch (err) {
+        $('#nameErr').textContent = err.message;
+      }
+    });
+
+    function joined(res, av) {
+      me = { id: res.playerId, name: res.name, avatar: av };
+      history.replaceState(null, '', `play.html?code=${code}`);
+      $('#lobbyAvatar').textContent = me.avatar;
+      $('#lobbyName').textContent = me.name;
+      $('#hudAvatar').textContent = me.avatar;
+      $('#hudName').textContent = me.name;
+      connect();
+    }
+
+    // ----- live updates -----
+    function connect() {
+      es = new EventSource(`/api/rooms/${code}/stream`);
+      es.addEventListener('state', e => onState(JSON.parse(e.data)));
+      es.onerror = () => {
+        // EventSource retries on its own; if the room is gone the GET below tells us.
+        api(`/api/rooms/${code}`).catch(err => {
+          if (err.status === 404) gone('Game over', 'This game is no longer running.');
+        });
+      };
+    }
+
+    function onState(s) {
+      room = s;
+      offset = s.serverNow - Date.now();
+      const mine = s.players.find(p => p.id === me.id);
+      if (!mine) return gone('You were removed', 'The host removed you from this game.');
+
+      if (s.status === 'lobby') {
+        show('lobbyView');
+        $('#lobbyCount').textContent = `👥 ${s.players.length} player${s.players.length === 1 ? '' : 's'} in the lobby`;
+      } else if (s.status === 'playing') {
+        startGame(s, mine);
+        paintLive(s, mine);
+      } else if (s.status === 'ended') {
+        finish(s, mine);
+      }
+    }
+
+    function startGame(s, mine) {
+      if (quiz) return;
+      show('gameView');
+      sound('start');
+      $('#score').dataset.v = mine.score;
+      $('#score').textContent = fmt(mine.score);
+      quiz = new Quiz($('#stage'), {
+        grade: s.grade,
+        topics: s.topics,
+        onAnswer: async (correct, ms) => {
+          try {
+            const r = await api(`/api/rooms/${code}/answer`, { playerId: me.id, correct, ms });
+            countTo($('#score'), r.score);
+            $('#streak').textContent = r.streak;
+            $('#streakPill').classList.toggle('hot', r.streak >= 3);
+            $('#multPill').hidden = r.multLeft <= 0;
+            $('#multLeft').textContent = `${r.multLeft} left`;
+            return r;
+          } catch (err) {
+            if (err.status !== 409) toast('Connection hiccup — keep going!');
+            throw err;
+          }
+        },
+      });
+      quiz.start();
+      timerInt = setInterval(tickTimer, 250);
+      tickTimer();
+    }
+
+    function tickTimer() {
+      if (!room) return;
+      if (!room.endsAt) { $('#timer').textContent = '∞'; return; }
+      const left = (room.endsAt - (Date.now() + offset)) / 1000;
+      $('#timer').textContent = fmtTime(left);
+      $('#timerPill').classList.toggle('low', left <= 10);
+    }
+
+    function paintLive(s, mine) {
+      const rank = s.players.indexOf(mine) + 1;
+      $('#rank').textContent = `#${rank} of ${s.players.length}`;
+      const pct = Math.min(100, (s.classTotal / s.goal) * 100);
+      $('#goalFill').style.width = `${pct}%`;
+      $('#goalRocket').style.left = `${pct}%`;
+      $('#classTotal').textContent = fmt(s.classTotal);
+      $('#goal').textContent = fmt(s.goal);
+    }
+
+    function finish(s, mine) {
+      if (ended) return;
+      ended = true;
+      quiz?.stop();
+      clearInterval(timerInt);
+      $$('.overlay').forEach(o => o.remove());
+      const rank = s.players.indexOf(mine) + 1;
+      const acc = mine.answered ? Math.round((mine.correct / mine.answered) * 100) : 0;
+      $('#endMedal').textContent = ['🥇', '🥈', '🥉'][rank - 1] || (acc >= 70 ? '🌟' : '💪');
+      $('#endTitle').textContent = rank === 1 ? 'You WON!' : rank <= 3 ? `You got #${rank}!` : `You finished #${rank}`;
+      $('#endSub').textContent = `out of ${s.players.length} players`;
+      $('#eScore').dataset.v = 0;
+      countTo($('#eScore'), mine.score, 1200);
+      $('#eCorrect').textContent = `${mine.correct}/${mine.answered}`;
+      $('#eAcc').textContent = `${acc}%`;
+      $('#eStreak').textContent = mine.bestStreak;
+      $('#endGoal').textContent = s.classTotal >= s.goal
+        ? `🚀 Your class reached the goal with ${fmt(s.classTotal)} points!`
+        : `🚀 Your class earned ${fmt(s.classTotal)} of ${fmt(s.goal)} points together.`;
+      renderBoard($('#endBoard'), s.players, { limit: 5, meId: me.id });
+      show('endView');
+      store.set(`mb:player:${code}`, null);
+      es?.close();
+      if (rank <= 3 || s.classTotal >= s.goal) { confetti(); sound('fanfare'); }
+    }
+
+    function gone(title, sub) {
+      quiz?.stop();
+      clearInterval(timerInt);
+      es?.close();
+      store.set(`mb:player:${code}`, null);
+      $('#goneTitle').textContent = title;
+      $('#goneSub').textContent = sub;
+      show('goneView');
+    }
+
+    if ($('#code').value) $('#codeForm').requestSubmit();
+    else $('#code').focus();
+  </script>
+</body>
+</html>
