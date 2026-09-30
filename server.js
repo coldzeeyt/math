@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { newPlayerStats, scoreAnswer } from './public/js/scoring.js';
+import { newPlayerStats, scoreAnswer, scoreSkip } from './public/js/scoring.js';
 import { GRADES, topicsForGrade } from './public/js/questions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,7 +40,7 @@ function publicState(room) {
   const players = [...room.players.values()]
     .map(p => ({
       id: p.id, name: p.name, avatar: p.avatar, score: p.score, correct: p.correct,
-      answered: p.answered, streak: p.streak, bestStreak: p.bestStreak,
+      answered: p.answered, skipped: p.skipped, streak: p.streak, bestStreak: p.bestStreak,
     }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   return {
@@ -73,8 +73,8 @@ function broadcast(room) {
   }, 200);
 }
 
-function pushFeed(room, text) {
-  room.feed.push({ id: crypto.randomUUID(), text, at: Date.now() });
+function pushFeed(room, text, type = 'info') {
+  room.feed.push({ id: crypto.randomUUID(), text, type, at: Date.now() });
   if (room.feed.length > 30) room.feed.shift();
 }
 
@@ -166,8 +166,14 @@ const api = {
     if (now - player.lastAnswerAt < MIN_ANSWER_GAP_MS) return json(res, 429, { error: 'Slow down!' });
     player.lastAnswerAt = now;
 
-    const ms = Math.max(0, Math.min(Number(body.ms) || 10000, 600000));
-    const result = scoreAnswer(player, { correct: body.correct === true, ms });
+    let result;
+    if (body.skipped === true) {
+      result = scoreSkip(player);
+      pushFeed(room, `🙈 ${player.name.toUpperCase()} SKIPPED A QUESTION!!`, 'skip');
+    } else {
+      const ms = Math.max(0, Math.min(Number(body.ms) || 10000, 600000));
+      result = scoreAnswer(player, { correct: body.correct === true, ms });
+    }
     if (player.streak > 0 && player.streak % 5 === 0) {
       pushFeed(room, `🔥 ${player.name} is on a ${player.streak} streak!`);
     }

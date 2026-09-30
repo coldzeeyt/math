@@ -66,7 +66,6 @@ function near(ans, { spread = 3, min = 0, extra = [], count = 12 } = {}) {
 }
 
 const EMOJI = ['🍎', '⭐', '🐸', '🍩', '🎈', '🐞', '🍓', '⚽', '🐟', '🌸', '🧁', '🚗', '🐥', '🍪'];
-const SHAPES = ['circle', 'square', 'rectangle', 'triangle', 'hexagon', 'pentagon', 'star', 'oval', 'rhombus', 'octagon'];
 const COLORS = [V.PALETTE.purple, V.PALETTE.blue, V.PALETTE.green, V.PALETTE.orange, V.PALETTE.pink, V.PALETTE.teal, V.PALETTE.red];
 const NAMES = ['Mia', 'Leo', 'Ava', 'Kai', 'Zoe', 'Sam', 'Ivy', 'Max', 'Nia', 'Eli'];
 
@@ -90,11 +89,12 @@ topic(0, 'k-sub', 'Take away', '➖', () => {
 topic(0, 'k-compare', 'Bigger number', '🐊', () => {
   const nums = shuffle([...Array(20).keys()].map(i => i + 1)).slice(0, 4);
   const max = Math.max(...nums);
-  return q('🐊 Which number is the BIGGEST?', max, nums.filter(n => n !== max), V.numberLine(0, 20, null, { labelEvery: 5, dots: nums }), 'Bigger numbers are farther right');
+  return q(`🐊 Which is the BIGGEST: ${shuffle(nums).join(', ')}?`, max, nums.filter(n => n !== max), V.numberLine(0, 20, null, { labelEvery: 5, dots: nums }), 'Bigger numbers are farther right');
 });
 topic(0, 'k-shapes', 'Shapes', '🔷', () => {
-  const s = pick(['circle', 'square', 'triangle', 'rectangle', 'hexagon', 'star', 'oval']);
-  return q('What shape is this?', s, shuffle(SHAPES.filter(x => x !== s)), V.shape(s, pick(COLORS)));
+  const sides = { triangle: 3, square: 4, rectangle: 4, rhombus: 4, pentagon: 5, hexagon: 6, octagon: 8 };
+  const s = pick(Object.keys(sides));
+  return q(`How many sides does this ${s} have?`, sides[s], near(sides[s], { spread: 2, min: 3 }), V.shape(s, pick(COLORS)));
 });
 topic(0, 'k-tenframe', 'Ten frames', '🟥', () => {
   const n = rand(1, 10);
@@ -211,19 +211,18 @@ topic(4, 'g4-div', 'Long division', '➗', () => {
 });
 topic(4, 'g4-equiv', 'Equivalent fractions', '🟦', () => {
   const d = pick([2, 3, 4, 5]), n = rand(1, d - 1), k = rand(2, 4);
-  return q(`Which fraction is equal to ${n}/${d}?`, `${n * k}/${d * k}`, [`${n + k}/${d + k}`, `${n * k}/${d}`, `${n}/${d * k}`, `${n * k + 1}/${d * k}`], V.fractionBars([[n, d], [n * k, d * k]]));
+  return q(`Fill in the missing number: ${n}/${d} = ?/${d * k}`, n * k, [n + k, n * k + 1, n, d * k - n], V.fractionBars([[n, d], [n * k, d * k]]));
 });
 topic(4, 'g4-angles', 'Types of angles', '📐', () => {
   const kind = pick(['acute', 'right', 'obtuse', 'straight']);
   const deg = { acute: rand(20, 75), right: 90, obtuse: rand(105, 165), straight: 180 }[kind];
-  return q('What kind of angle is this?', kind, ['acute', 'right', 'obtuse', 'straight', 'reflex'].filter(k => k !== kind), V.angle(deg));
+  return q('Is this angle acute, right, obtuse or straight?', kind, ['acute', 'right', 'obtuse', 'straight', 'reflex'].filter(k => k !== kind), V.angle(deg));
 });
 topic(4, 'g4-factors', 'Factors & multiples', '🧩', () => {
-  const n = pick([12, 18, 20, 24, 28, 30, 36, 40, 42, 45, 48]);
+  const n = pick([12, 18, 20, 24, 28, 30, 36, 40, 42, 45, 48, 54, 56, 63, 72]);
   const factors = [...Array(n).keys()].slice(2).filter(f => n % f === 0 && f < n);
-  const non = [...Array(n).keys()].slice(2).filter(f => n % f !== 0);
-  const ans = pick(factors);
-  return q(`Which number is a factor of ${n}?`, ans, shuffle(non), V.bigExpr(`${n} = ? × ?`));
+  const a = pick(factors);
+  return q(`Find the missing factor: ${n} = ${a} × ?`, n / a, near(n / a, { spread: 3, min: 1 }), V.dotArray(a, n / a, pick(COLORS)));
 });
 topic(4, 'g4-compare-frac', 'Comparing fractions', '⚖️', () => {
   const d1 = pick([3, 4, 5, 6, 8]), d2 = pick([3, 4, 5, 6, 8].filter(x => x !== d1));
@@ -231,7 +230,7 @@ topic(4, 'g4-compare-frac', 'Comparing fractions', '⚖️', () => {
   if (n1 * d2 === n2 * d1) n1 = n1 === 1 ? 2 : n1 - 1;
   const ans = n1 * d2 > n2 * d1 ? `${n1}/${d1}` : `${n2}/${d2}`;
   const other = ans === `${n1}/${d1}` ? `${n2}/${d2}` : `${n1}/${d1}`;
-  return q('Which fraction is GREATER?', ans, [other, `1/${Math.max(d1, d2) * 2}`, `1/${d1 + d2}`], V.fractionBars([[n1, d1], [n2, d2]]));
+  return q(`Which is GREATER: ${n1}/${d1} or ${n2}/${d2}?`, ans, [other, `1/${Math.max(d1, d2) * 2}`, `1/${d1 + d2}`], V.fractionBars([[n1, d1], [n2, d2]]));
 });
 
 // 5th grade
@@ -368,9 +367,10 @@ topic(8, 'g8-pythag', 'Pythagorean theorem', '📐', () => {
 topic(8, 'g8-exprules', 'Exponent rules', '⚡', () => {
   const b = rand(2, 9), m = rand(2, 7), n = rand(2, 6);
   const op = pick(['×', '÷', 'pow']);
-  if (op === '×') return q(`${b}${sup(m)} × ${b}${sup(n)} = ?`, `${b}${sup(m + n)}`, [`${b}${sup(m * n)}`, `${b * b}${sup(m + n)}`, `${b}${sup(Math.abs(m - n))}`], V.bigExpr(`${b}${sup(m)} × ${b}${sup(n)}`));
-  if (op === '÷') { const big = m + n; return q(`${b}${sup(big)} ÷ ${b}${sup(n)} = ?`, `${b}${sup(m)}`, [`${b}${sup(big + n)}`, `${b}${sup(big * n)}`, `1${sup(m)}`, `${b}${sup(n)}`], V.bigExpr(`${b}${sup(big)} ÷ ${b}${sup(n)}`)); }
-  return q(`(${b}${sup(m)})${sup(n)} = ?`, `${b}${sup(m * n)}`, [`${b}${sup(m + n)}`, `${b * n}${sup(m)}`, `${b}${sup(m ** n)}`], V.bigExpr(`(${b}${sup(m)})${sup(n)}`));
+  const ask = expr => `${expr} = ${b}ⁿ. What is n?`;
+  if (op === '×') return q(ask(`${b}${sup(m)} × ${b}${sup(n)}`), m + n, [m * n, Math.abs(m - n)], V.bigExpr(`${b}${sup(m)} × ${b}${sup(n)} = ${b}ⁿ`));
+  if (op === '÷') { const big = m + n; return q(ask(`${b}${sup(big)} ÷ ${b}${sup(n)}`), m, [big + n, big * n], V.bigExpr(`${b}${sup(big)} ÷ ${b}${sup(n)} = ${b}ⁿ`)); }
+  return q(ask(`(${b}${sup(m)})${sup(n)}`), m * n, [m + n, m ** n], V.bigExpr(`(${b}${sup(m)})${sup(n)} = ${b}ⁿ`));
 });
 topic(8, 'g8-roots', 'Square roots', '√', () => {
   const n = rand(2, 15);
@@ -395,6 +395,7 @@ const HINTS = {
   'k-add': 'Count all the pictures together.',
   'k-sub': 'Count the ones that are NOT crossed out.',
   'k-compare': 'Numbers get bigger as you move right on the number line.',
+  'k-shapes': 'Count each straight edge of the shape.',
   'k-tenframe': 'A full ten frame has 10 boxes.',
   'g1-add20': 'Fill up a ten first, then add the rest.',
   'g1-sub20': 'Count the ones that are left over.',
@@ -413,7 +414,7 @@ const HINTS = {
   'g3-round': '5 or more rounds up. 4 or less rounds down.',
   'g4-equiv': 'Multiply the top and bottom by the same number.',
   'g4-angles': 'Acute < 90°, right = 90°, obtuse > 90°, straight = 180°.',
-  'g4-factors': 'A factor divides the number with no remainder.',
+  'g4-factors': 'Divide: what times this number makes the total?',
   'g4-compare-frac': 'Compare the shaded parts of the bars.',
   'g5-decimals': 'Line up the decimal points before adding.',
   'g5-pow10': '× 10 moves the decimal right; ÷ 10 moves it left.',

@@ -1,20 +1,14 @@
 // The self-paced question loop shared by solo and live play.
 import { makeQuestion } from './questions.js';
 import { esc, mathHtml, sound, flash, confetti } from './ui.js';
-
-const SHAPES = [
-  '<svg class="shape" viewBox="0 0 30 30"><polygon points="15,3 28,27 2,27" fill="#fff"/></svg>',
-  '<svg class="shape" viewBox="0 0 30 30"><polygon points="15,2 28,15 15,28 2,15" fill="#fff"/></svg>',
-  '<svg class="shape" viewBox="0 0 30 30"><circle cx="15" cy="15" r="13" fill="#fff"/></svg>',
-  '<svg class="shape" viewBox="0 0 30 30"><rect x="3" y="3" width="24" height="24" rx="3" fill="#fff"/></svg>',
-];
+import { answerParts, isCorrect, keypadExtras } from './answers.js';
 
 const CHEER = ['Nice!', 'Awesome!', 'Boom!', 'Genius!', 'Yes!', 'Great!', 'Wow!', 'Super!'];
 
 export class Quiz {
   /**
    * @param {HTMLElement} root
-   * @param {{grade:number, topics:string[], onAnswer:(correct:boolean, ms:number)=>Promise<any>}} opts
+   * @param {{grade:number, topics:string[], onAnswer:(correct:boolean, ms:number, skipped:boolean)=>Promise<any>}} opts
    */
   constructor(root, { grade, topics, onAnswer }) {
     this.root = root;
@@ -24,12 +18,6 @@ export class Quiz {
     this.stopped = false;
     this.busy = false;
     this.recent = [];
-    this.onKey = e => {
-      if (this.busy || this.stopped) return;
-      const i = ['1', '2', '3', '4'].indexOf(e.key);
-      if (i >= 0) this.choose(i);
-    };
-    document.addEventListener('keydown', this.onKey);
   }
 
   start() {
@@ -39,8 +27,7 @@ export class Quiz {
 
   stop() {
     this.stopped = true;
-    document.removeEventListener('keydown', this.onKey);
-    this.root.querySelectorAll('.answer').forEach(b => (b.disabled = true));
+    this.root.querySelectorAll('button, input').forEach(b => (b.disabled = true));
   }
 
   next() {
@@ -53,36 +40,68 @@ export class Quiz {
     this.recent = [q.prompt, ...this.recent].slice(0, 8);
     this.q = q;
     this.busy = false;
+    const { prefix, suffix, kind } = answerParts(q.answer);
+    const word = kind === 'word';
+    // Calculator layout: digits on the left, ⌫ and symbols down the right, a wide 0 at the bottom.
+    const [e0 = '', e1 = '', e2 = ''] = keypadExtras(kind, this.grade);
+    const keys = ['7', '8', '9', '⌫', '4', '5', '6', e0, '1', '2', '3', e1, '0', e2];
     this.root.innerHTML = `
       <div class="qcard">
         <span class="qtopic">${q.topicIcon} ${esc(q.topicName)}</span>
         <div class="qprompt">${mathHtml(q.prompt)}</div>
         <div class="qvisual">${q.visual}</div>
       </div>
-      <div class="answers">
-        ${q.choices.map((c, i) => `<button class="answer" data-i="${i}">${SHAPES[i]}<span class="key">${i + 1}</span><span>${mathHtml(c)}</span></button>`).join('')}
-      </div>`;
-    this.root.querySelectorAll('.answer').forEach(b => b.addEventListener('click', () => this.choose(Number(b.dataset.i))));
+      <form class="answer-row" autocomplete="off">
+        <label class="answer-box">
+          ${prefix ? `<span class="affix">${esc(prefix.trim())}</span>` : ''}
+          <input class="answer-input" name="a" maxlength="14" spellcheck="false" autocapitalize="off"
+                 inputmode="${word ? 'text' : 'none'}" placeholder="${word ? 'type a word' : '?'}" aria-label="Your answer">
+          ${suffix ? `<span class="affix">${esc(suffix.trim())}</span>` : ''}
+        </label>
+        <button class="btn big green submit" type="submit" aria-label="Submit answer">✓</button>
+        <button type="button" class="btn ghost skip" title="Skip this question (everyone will see!)">Skip<br>⏭</button>
+      </form>
+      ${word ? '' : `<div class="keypad">${keys.map(k => k ? `<button type="button" class="key ${k === '⌫' ? 'back' : ''} ${k === '0' ? 'wide' : ''}" data-k="${k}">${k}</button>` : '<span></span>').join('')}</div>`}`;
+
+    const input = this.root.querySelector('.answer-input');
+    this.root.querySelector('.answer-row').addEventListener('submit', e => { e.preventDefault(); this.submit(); });
+    this.root.querySelector('.skip').addEventListener('click', () => this.skip());
+    this.root.querySelector('.keypad')?.addEventListener('click', e => {
+      const k = e.target.closest('.key')?.dataset.k;
+      if (!k || this.busy) return;
+      input.value = k === '⌫' ? input.value.slice(0, -1) : (input.value + k).slice(0, 14);
+      sound('tick');
+    });
+    // Only grab focus when a real keyboard is likely, so phones don't pop up their own keyboard.
+    if (word || matchMedia('(pointer: fine)').matches) input.focus();
     this.t0 = performance.now();
   }
 
-  async choose(i) {
+  submit() {
+    const input = this.root.querySelector('.answer-input');
+    if (this.busy || this.stopped || !input.value.trim()) {
+      if (!input.value.trim()) input.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 200);
+      return;
+    }
+    this.finish(isCorrect(input.value, this.q.answer), false);
+  }
+
+  skip() {
     if (this.busy || this.stopped) return;
+    this.finish(false, true);
+  }
+
+  async finish(correct, skipped) {
     this.busy = true;
     const ms = Math.round(performance.now() - this.t0);
     const q = this.q;
-    const correct = q.choices[i] === q.answer;
-    const buttons = [...this.root.querySelectorAll('.answer')];
-    buttons.forEach((b, j) => {
-      b.disabled = true;
-      if (q.choices[j] === q.answer) b.classList.add('right');
-      else if (j === i) b.classList.add('wrong');
-      else b.classList.add('dim');
-    });
+    this.root.querySelectorAll('.answer-row input, .answer-row button, .key, .skip').forEach(b => (b.disabled = true));
+    const box = this.root.querySelector('.answer-box');
+    box.classList.add(correct ? 'right' : skipped ? 'skipped' : 'wrong');
 
     let result = null;
     try {
-      result = await this.onAnswer(correct, ms);
+      result = await this.onAnswer(correct, ms, skipped);
     } catch {
       // Network hiccup or game over: the page decides what to do via its own state.
     }
@@ -93,8 +112,8 @@ export class Quiz {
       sound(streak > 0 && streak % 3 === 0 ? 'streak' : 'correct');
       flash(result?.gained ? `+${result.gained}` : CHEER[Math.floor(Math.random() * CHEER.length)]);
     } else {
-      sound('wrong');
-      flash('Oops!', false);
+      sound(skipped ? 'pop' : 'wrong');
+      flash(skipped ? 'Skipped!' : 'Oops!', false);
       const was = document.createElement('div');
       was.className = 'correct-was';
       was.innerHTML = `The answer was <span style="font-size:1.25em">${mathHtml(q.answer)}</span>${q.hint ? `<span class="hint">💡 ${mathHtml(q.hint)}</span>` : ''}`;

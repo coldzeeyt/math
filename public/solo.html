@@ -70,7 +70,7 @@
     import { initSky, muteButton, $, store, fmt, fmtTime, countTo, confetti, sound, gradeLabel, esc } from './js/ui.js';
     import { renderSetup } from './js/setup.js';
     import { Quiz } from './js/quiz.js';
-    import { newPlayerStats, scoreAnswer } from './js/scoring.js';
+    import { newPlayerStats, scoreAnswer, scoreSkip } from './js/scoring.js';
 
     initSky();
     muteButton($('#mute'));
@@ -118,8 +118,8 @@
       quiz = new Quiz($('#stage'), {
         grade: settings.grade,
         topics: settings.topics,
-        onAnswer: async (correct, ms) => {
-          const r = scoreAnswer(stats, { correct, ms });
+        onAnswer: async (correct, ms, skipped) => {
+          const r = skipped ? scoreSkip(stats) : scoreAnswer(stats, { correct, ms });
           paintHud();
           return { ...r, streak: stats.streak };
         },

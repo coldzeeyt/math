@@ -211,7 +211,7 @@
       const feed = s.feed.slice().reverse().slice(0, 6);
       if (feed[0]?.id !== lastFeedId) {
         lastFeedId = feed[0]?.id;
-        $('#feed').innerHTML = feed.map((f, i) => `<div class="feed-item" style="${i ? 'animation:none' : ''}">${esc(f.text)}</div>`).join('');
+        $('#feed').innerHTML = feed.map((f, i) => `<div class="feed-item ${f.type === 'skip' ? 'skip' : ''}" style="${i ? 'animation:none' : ''}">${esc(f.text)}</div>`).join('');
       }
     }
 
@@ -236,8 +236,8 @@
         [fmt(s.classTotal), 'class points'], [s.players.length, 'players'], [fmt(answered), 'questions answered'],
         [answered ? Math.round((correct / answered) * 100) + '%' : '–', 'accuracy'],
       ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
-      $('#endTable').innerHTML = `<tr><th>#</th><th>Player</th><th class="num">Correct</th><th class="num">Accuracy</th><th class="num">Best streak</th><th class="num">Points</th></tr>` +
-        s.players.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.avatar)} ${esc(p.name)}</td><td class="num">${p.correct}/${p.answered}</td><td class="num">${p.answered ? Math.round((p.correct / p.answered) * 100) : 0}%</td><td class="num">${p.bestStreak}</td><td class="num"><b>${fmt(p.score)}</b></td></tr>`).join('');
+      $('#endTable').innerHTML = `<tr><th>#</th><th>Player</th><th class="num">Correct</th><th class="num">Accuracy</th><th class="num">Skipped</th><th class="num">Best streak</th><th class="num">Points</th></tr>` +
+        s.players.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.avatar)} ${esc(p.name)}</td><td class="num">${p.correct}/${p.answered}</td><td class="num">${p.answered ? Math.round((p.correct / p.answered) * 100) : 0}%</td><td class="num">${p.skipped}</td><td class="num">${p.bestStreak}</td><td class="num"><b>${fmt(p.score)}</b></td></tr>`).join('');
 
       const top = s.players.slice(0, 3);
       $('#podium').innerHTML = top.map((p, i) => `<div class="spot p${i + 1}">
@@ -255,8 +255,8 @@
 
     $('#csv').addEventListener('click', () => {
       if (!room) return;
-      const rows = [['Rank', 'Name', 'Points', 'Correct', 'Answered', 'Accuracy %', 'Best streak']];
-      room.players.forEach((p, i) => rows.push([i + 1, p.name, p.score, p.correct, p.answered, p.answered ? Math.round((p.correct / p.answered) * 100) : 0, p.bestStreak]));
+      const rows = [['Rank', 'Name', 'Points', 'Correct', 'Answered', 'Accuracy %', 'Skipped', 'Best streak']];
+      room.players.forEach((p, i) => rows.push([i + 1, p.name, p.score, p.correct, p.answered, p.answered ? Math.round((p.correct / p.answered) * 100) : 0, p.skipped, p.bestStreak]));
       const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));

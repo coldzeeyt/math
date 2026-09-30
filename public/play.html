@@ -52,7 +52,7 @@
       <h2>You're in, <span id="lobbyName"></span>!</h2>
       <p style="font-size:1.25rem;opacity:.9">See your name on the big screen? Waiting for the host to start<span class="dots"></span></p>
       <p class="pill" id="lobbyCount" style="margin-top:12px"></p>
-      <p style="opacity:.8;margin-top:24px">💡 Tip: you can press <b>1 2 3 4</b> on the keyboard to answer.</p>
+      <p style="opacity:.8;margin-top:24px">💡 Tip: type your answer and press <b>Enter</b>. Stuck? You can skip — but the whole class will see it! 🙈</p>
     </div>
   </main>
 
@@ -223,9 +223,9 @@
       quiz = new Quiz($('#stage'), {
         grade: s.grade,
         topics: s.topics,
-        onAnswer: async (correct, ms) => {
+        onAnswer: async (correct, ms, skipped) => {
           try {
-            const r = await api(`/api/rooms/${code}/answer`, { playerId: me.id, correct, ms });
+            const r = await api(`/api/rooms/${code}/answer`, { playerId: me.id, correct, ms, skipped });
             countTo($('#score'), r.score);
             $('#streak').textContent = r.streak;
             $('#streakPill').classList.toggle('hot', r.streak >= 3);

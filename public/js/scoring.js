@@ -3,13 +3,16 @@
 export const CHEST_EVERY = 5; // a treasure chest pops every 5 correct answers in a row
 
 export function newPlayerStats() {
-  return { score: 0, correct: 0, answered: 0, streak: 0, bestStreak: 0, mult: 1, multLeft: 0 };
+  return { score: 0, correct: 0, answered: 0, skipped: 0, streak: 0, bestStreak: 0, mult: 1, multLeft: 0 };
 }
+
+// Answers typed faster than this earn a speed bonus (scaled down to 0 at the limit).
+export const SPEED_WINDOW_MS = 20000;
 
 // Points for one correct answer: base + streak bonus + speed bonus, then any active multiplier.
 export function pointsFor(streak, ms) {
   const streakBonus = Math.min(Math.max(streak - 1, 0), 10) * 10;
-  const speedBonus = Math.max(0, Math.round(50 * (1 - Math.min(ms, 12000) / 12000)));
+  const speedBonus = Math.max(0, Math.round(50 * (1 - Math.min(ms, SPEED_WINDOW_MS) / SPEED_WINDOW_MS)));
   return 100 + streakBonus + speedBonus;
 }
 
@@ -37,6 +40,13 @@ export function scoreAnswer(stats, { correct, ms = 10000 }) {
     gained += chest.amount;
   }
   return { gained, chest };
+}
+
+/** Skipping is allowed but costs your streak (so you can't skip hard ones to farm chests). */
+export function scoreSkip(stats) {
+  stats.skipped++;
+  stats.streak = 0;
+  return { gained: 0, chest: null };
 }
 
 export function openChest(stats, roll = Math.random()) {
