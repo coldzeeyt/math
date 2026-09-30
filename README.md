@@ -14,7 +14,6 @@ A Kahoot / Blooket-style math game where **every student plays at their own pace
 
 - **Type your answer, MathJam-style.** Students type answers with an on-screen number pad or a keyboard, then press ✓ or Enter. Units such as `$`, `¢`, `cm`, `%`, `π` and `x =` are already shown around the box. Equivalent answers are accepted, so 1/2, 2/4 and 0.5 all count.
 - **Skip, but everyone sees it.** Stuck students can press Skip. It costs their streak, and the host screen shows a big yellow **"NAME SKIPPED A QUESTION!!"** in the feed. The results table and CSV include a Skipped column.
-
 - **Streaks & speed bonus.** 100 points per correct answer, plus up to +100 for a streak and up to +50 for answering quickly.
 - **Treasure chests.** Every 5 correct in a row opens a chest: Gold Pile, Double Power (2× for 3 answers), Gem Bonus (+10%) or JACKPOT.
 - **Class rocket.** Every point any student earns fuels a rocket toward the class goal.
